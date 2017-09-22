@@ -1,13 +1,27 @@
 package youga.tamingtask.taming;
 
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.support.v4.app.NotificationCompat;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Log;
 
 
 import java.io.ByteArrayInputStream;
@@ -15,6 +29,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Random;
+
+import youga.tamingtask.ExerciseTamingActivity;
+import youga.tamingtask.R;
 
 /**
  * @author YougaKingWu
@@ -24,33 +46,64 @@ import java.io.ObjectOutputStream;
 
 public class TamingUtil {
 
+    public static final SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd/HH-mm-ss", Locale.CHINA);
 
-    private static SharedPreferences getTamingPreferences(Context context) {
+    public static SharedPreferences getTamingPreferences(Context context) {
         return context.getSharedPreferences("tamingNoticeTask", Context.MODE_PRIVATE);
 
     }
 
 
     public static void init(Context context) {
-        Context aContext = context.getApplicationContext();
-//        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-//            JobScheduler jobScheduler = (JobScheduler) aContext.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-//            jobScheduler.cancelAll();
-//            JobInfo.Builder builder = new JobInfo.Builder(1, new ComponentName(aContext.getPackageName(), JobSchedulerService.class.getName()))
-//                    .setPeriodic(1000 * 60);
-//            jobScheduler.schedule(builder.build());
-//        } else {
-//
-//        }
-        Intent service = new Intent(context, TamingService.class);
-        context.startService(service);
+
+
+        context.startService(new Intent(context, TamingService.class));//启动闹钟服务
+        //绑定闹钟服务
+//        Intent intent = new Intent(context, TamingService.class);
+//        context.bindService(intent, conn, Context.BIND_AUTO_CREATE);
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            JobScheduler jobScheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            JobInfo.Builder builder = new JobInfo.Builder(121, new ComponentName(context.getPackageName(), JobSchedulerService.class.getName()));
+            builder.setPeriodic(60 * 1000); //每隔60秒运行一次
+            //Android 7.0+ 增加了一项针对 JobScheduler 的新限制，最小间隔只能是下面设定的数字
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                builder.setPeriodic(JobInfo.getMinPeriodMillis(), JobInfo.getMinFlexMillis());
+            }
+            builder.setRequiresCharging(true);
+            builder.setPersisted(true);  //设置设备重启后，是否重新执行任务
+            builder.setRequiresDeviceIdle(true);
+
+            if (jobScheduler.schedule(builder.build()) <= 0) {
+                Log.w("init", "jobScheduler.schedule something goes wrong");
+            }
+        }
+
+        setTamingAlarmTask(context);
     }
 
+    public static void setTamingAlarmTask(Context context) {
+        Intent alarmIntent = new Intent();
+        alarmIntent.setAction(TamingReceiver.ALARM_WAKE_ACTION);
+        PendingIntent operation = PendingIntent.getBroadcast(context, 0, alarmIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(operation);
+        NoticeTask task = obtainNoticeTask(context);
+        long triggerAtMillis = task.triggerAtMillis();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
+        } else {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
+        }
+        Log.d("loopAlarmTask", "triggerAtMillis:" + triggerAtMillis + "-->" + mFormat.format(new Date(triggerAtMillis)) +
+                "\nTimeInMillis:" + Calendar.getInstance().getTimeInMillis() + "-->" + mFormat.format(Calendar.getInstance().getTime()));
+    }
 
     public static NoticeTask obtainNoticeTask(Context context) {
         SharedPreferences preferences = getTamingPreferences(context);
         String string = preferences.getString(NoticeTask.class.getSimpleName(), null);
-        if (TextUtils.isEmpty(string)) return new NoticeTask();
+        if (TextUtils.isEmpty(string)) return new NoticeTask(NoticeTask.defaultTime);
         byte[] base64Bytes = Base64.decode(string, Base64.DEFAULT);
         ByteArrayInputStream stream = new ByteArrayInputStream(base64Bytes);
         ObjectInputStream ois = null;
@@ -59,7 +112,7 @@ public class TamingUtil {
             return (NoticeTask) ois.readObject();
         } catch (Exception e) {
             e.printStackTrace();
-            return new NoticeTask();
+            return new NoticeTask(NoticeTask.defaultTime);
         } finally {
             try {
                 stream.close();
@@ -90,5 +143,79 @@ public class TamingUtil {
                 e.printStackTrace();
             }
         }
+    }
+
+    static void buildNotification(Context context, int week) {
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        PendingIntent contentIntent = PendingIntent.getActivity(context, 0, new Intent(context, ExerciseTamingActivity.class), 0);
+
+        String text;
+//        switch (week) {
+//            case NoticeTask.MONDAY:
+//                String[] strings = context.getResources().getStringArray(R.array.weeks_monday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.TUESDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_tuesday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.WEDNESDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_wednesday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.THURSDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_thursday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.FRIDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_friday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.SATURDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_saturday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            case NoticeTask.SUNDAY:
+//                strings = context.getResources().getStringArray(R.array.weeks_sunday);
+//                text = strings[new Random().nextInt(strings.length)];
+//                break;
+//            default:
+//                text = context.getResources().getString(R.string.app_name);
+//                break;
+//        }
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(context.getResources().getString(R.string.app_name))
+                .setContentText(mFormat.format(Calendar.getInstance().getTime()))
+                .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
+                .setAutoCancel(true)
+                .setContentIntent(contentIntent);
+
+        manager.notify(10, builder.build());
+    }
+
+
+    @TargetApi(Build.VERSION_CODES.M)
+    public static boolean isIgnoringBatteryOptimizations(Context context) {
+        String packageName = context.getPackageName();
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        return pm.isIgnoringBatteryOptimizations(packageName);
+    }
+
+
+    @TargetApi(Build.VERSION_CODES.M)
+    public static void isIgnoreBatteryOption(Activity activity, int resultCode) {
+//        try {
+//            Intent intent = new Intent();
+//            String packageName = activity.getPackageName();
+//            PowerManager pm = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+//            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+//                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+//                intent.setData(Uri.parse("package:" + packageName));
+//                activity.startActivityForResult(intent, resultCode);
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
     }
 }

@@ -26,5 +26,7 @@ dependencies {
     })
     compile 'com.android.support:appcompat-v7:25.+'
     compile 'com.android.support.constraint:constraint-layout:1.0.2'
+    compile 'com.contrarywind:Android-PickerView:3.2.6'
+    compile 'com.coolerfall:android-app-daemon:1.2.0'
     testCompile 'junit:junit:4.12'
 }

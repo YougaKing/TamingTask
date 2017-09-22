@@ -15,13 +15,15 @@ public class JobSchedulerService extends JobService {
 
     @Override
     public boolean onStartJob(JobParameters params) {
-        NoticeTask task = TamingUtil.obtainNoticeTask(this);
-        Log.w(TAG, "onStartJob()--" + task);
+//        NoticeTask task = TamingUtil.obtainNoticeTask(this);
+        Log.w(TAG, "onStartJob()--" + params.toString());
+        TamingUtil.setTamingAlarmTask(this);
         return false;
     }
 
     @Override
     public boolean onStopJob(JobParameters params) {
+        Log.w(TAG, "onStopJob()--" + params.toString());
         return false;
     }
 }

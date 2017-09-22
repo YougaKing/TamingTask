@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="youga.tamingtask">
 
+
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:name=".TamingApplication"
         android:allowBackup="true"
@@ -10,7 +14,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        <activity android:name=".ExerciseTamingActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
@@ -21,14 +25,44 @@
         <service
             android:name=".taming.JobSchedulerService"
             android:enabled="true"
-            android:exported="false"
+            android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE">
         </service>
         <service
             android:name=".taming.TamingService"
             android:enabled="true"
-            android:exported="false">
+            android:exported="true"
+            android:process=":Taming">
         </service>
+
+        <service
+            android:name=".taming.TamingService$TamingInnerService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":Taming"
+            />
+
+        <receiver
+            android:name=".taming.TamingReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="youga.tamingtask.taming.GRAY_WAKE_ACTION"/>
+                <action android:name="youga.tamingtask.taming.ALARM_WAKE_ACTION"/>
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".taming.TamingReceiver$TamingNotifyService"
+            android:enabled="true"
+            android:exported="false"/>
+
+        <service
+            android:name=".taming.TamingReceiver$TamingNotifyInnerService"
+            android:enabled="true"
+            android:exported="false"/>
+
+
     </application>
 
 </manifest>
