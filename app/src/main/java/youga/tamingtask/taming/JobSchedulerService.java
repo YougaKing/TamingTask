@@ -2,6 +2,7 @@ package youga.tamingtask.taming;
 
 import android.app.job.JobParameters;
 import android.app.job.JobService;
+import android.content.Intent;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
 import android.util.Log;
@@ -15,9 +16,10 @@ public class JobSchedulerService extends JobService {
 
     @Override
     public boolean onStartJob(JobParameters params) {
-//        NoticeTask task = TamingUtil.obtainNoticeTask(this);
         Log.w(TAG, "onStartJob()--" + params.toString());
-        TamingUtil.setTamingAlarmTask(this);
+        Intent intent = new Intent(this, TamingService.class);
+        intent.setAction(TamingService.GUARD_INTERVAL_ACTION);
+        startService(intent);
         return false;
     }
 

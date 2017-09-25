@@ -55,30 +55,8 @@ public class TamingUtil {
 
 
     public static void init(Context context) {
-
-
-        context.startService(new Intent(context, TamingService.class));//启动闹钟服务
-        //绑定闹钟服务
-//        Intent intent = new Intent(context, TamingService.class);
-//        context.bindService(intent, conn, Context.BIND_AUTO_CREATE);
-
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            JobScheduler jobScheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-            JobInfo.Builder builder = new JobInfo.Builder(121, new ComponentName(context.getPackageName(), JobSchedulerService.class.getName()));
-            builder.setPeriodic(60 * 1000); //每隔60秒运行一次
-            //Android 7.0+ 增加了一项针对 JobScheduler 的新限制，最小间隔只能是下面设定的数字
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                builder.setPeriodic(JobInfo.getMinPeriodMillis(), JobInfo.getMinFlexMillis());
-            }
-            builder.setRequiresCharging(true);
-            builder.setPersisted(true);  //设置设备重启后，是否重新执行任务
-            builder.setRequiresDeviceIdle(true);
-
-            if (jobScheduler.schedule(builder.build()) <= 0) {
-                Log.w("init", "jobScheduler.schedule something goes wrong");
-            }
-        }
+        Intent intent = new Intent(context, TamingService.class);
+        context.startService(intent);
 
         setTamingAlarmTask(context);
     }
@@ -205,17 +183,17 @@ public class TamingUtil {
 
     @TargetApi(Build.VERSION_CODES.M)
     public static void isIgnoreBatteryOption(Activity activity, int resultCode) {
-//        try {
-//            Intent intent = new Intent();
-//            String packageName = activity.getPackageName();
-//            PowerManager pm = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
-//            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-//                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-//                intent.setData(Uri.parse("package:" + packageName));
-//                activity.startActivityForResult(intent, resultCode);
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
+        try {
+            Intent intent = new Intent();
+            String packageName = activity.getPackageName();
+            PowerManager pm = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + packageName));
+                activity.startActivityForResult(intent, resultCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

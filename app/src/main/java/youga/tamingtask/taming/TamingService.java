@@ -4,9 +4,11 @@ import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -25,10 +27,10 @@ import java.util.Locale;
 public class TamingService extends Service {
 
 
+    public static final String GUARD_INTERVAL_ACTION = "youga.tamingtask.taming.GUARD_INTERVAL_ACTION";
     private static final int GRAY_SERVICE_ID = Process.myPid();
     private static final int MSG = 1;
     private static final String TAG = "TamingService";
-    private static final long ALARM_INTERVAL = 1000 * 10;
     private SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd/HH-mm", Locale.CHINA);
 
     private Handler mHandler = new Handler(new Handler.Callback() {
@@ -74,15 +76,11 @@ public class TamingService extends Service {
         Log.d(TAG, "onCreate()");
 
         Daemon.run(TamingService.this, TamingService.class, Daemon.INTERVAL_ONE_MINUTE);
-//        startTimeTask();
-//        mHandler.sendMessage(mHandler.obtainMessage(MSG));
-    }
 
-    //@IntDef(value = {Service.START_FLAG_REDELIVERY, Service.START_FLAG_RETRY}, flag = true)
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand()");
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT_WATCH) {
+        Intent service = new Intent(this, TamingGuardService.class);
+        startService(service);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
             //API < 18 ，此方法能有效隐藏Notification上的图标
             startForeground(GRAY_SERVICE_ID, new Notification());
         } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
@@ -94,12 +92,18 @@ public class TamingService extends Service {
 
         }
 
-        //发送唤醒广播来促使挂掉的UI进程重新启动起来
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        Intent alarmIntent = new Intent();
-        alarmIntent.setAction(TamingReceiver.GRAY_WAKE_ACTION);
-        PendingIntent operation = PendingIntent.getBroadcast(this, 121, alarmIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-        alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), ALARM_INTERVAL, operation);
+        getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), TamingGuardService.class.getName()),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
+
+//        startTimeTask();
+//        mHandler.sendMessage(mHandler.obtainMessage(MSG));
+    }
+
+    //@IntDef(value = {Service.START_FLAG_REDELIVERY, Service.START_FLAG_RETRY}, flag = true)
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        Log.d(TAG, "onStartCommand()-->" + (intent != null ? intent.getAction() : "intent=null"));
 
         return START_STICKY;
     }
@@ -116,9 +120,6 @@ public class TamingService extends Service {
         Log.d(TAG, "onDestroy()");
     }
 
-    /**
-     * 给 API >= 18 的平台上用的灰色保活手段
-     */
     public static class TamingInnerService extends Service {
 
         @Override

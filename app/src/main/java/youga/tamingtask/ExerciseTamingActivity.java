@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.functions.Consumer;
 import rxbind.view.RxView;
+import youga.tamingtask.taming.IntentWrapper;
 import youga.tamingtask.taming.NoticeTask;
 import youga.tamingtask.taming.TamingUtil;
 
@@ -99,10 +100,11 @@ public class ExerciseTamingActivity extends Activity {
 
 
                         TamingUtil.setTamingAlarmTask(getBaseContext());
+                        IntentWrapper.whiteListMatters(ExerciseTamingActivity.this, "轨迹跟踪服务的持续运行");
 
-                        if (!TamingUtil.isIgnoringBatteryOptimizations(getBaseContext())) {
-                            TamingUtil.isIgnoreBatteryOption(ExerciseTamingActivity.this, REQUEST_IGNORE_BATTERY_CODE);
-                        }
+//                        if (!TamingUtil.isIgnoringBatteryOptimizations(getBaseContext())) {
+//                            TamingUtil.isIgnoreBatteryOption(ExerciseTamingActivity.this, REQUEST_IGNORE_BATTERY_CODE);
+//                        }
 //                        finish();
                     }
                 });
