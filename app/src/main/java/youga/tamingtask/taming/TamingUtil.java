@@ -69,7 +69,9 @@ public class TamingUtil {
         alarmManager.cancel(operation);
         NoticeTask task = obtainNoticeTask(context);
         long triggerAtMillis = task.triggerAtMillis();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
         } else {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
