@@ -38,7 +38,7 @@
 #### 应用保活可以分为两个方面,一. 提供进程优先级，降低进程被杀死的概率，二. 在进程被杀死后，进行拉活
 #### 提升进程优先级的方案可分为Activity 提升权限, Notification 提升权限
 * Activity 提升权限有网传QQ一像素Activity方案,该方案涉及触摸时间拦截，各种状态监听操作难度复杂。
-* Notification 提升权限，API小于18可以直接设置前台Notification。API大于18利用系统漏洞，两个Service共同设置同一个ID 的前台Notification，并关闭其中一个Service，Notification消失，另一个Service优先级不变,次漏洞API=24时被修复
+* Notification 提升权限，API小于18可以直接设置前台Notification。API大于18利用系统漏洞，两个Service共同设置同一个ID 的前台Notification，并关闭其中一个Service，Notification消失，另一个Service优先级不变,此漏洞API=24时被修复
 
        public void onCreate() {
             super.onCreate();
