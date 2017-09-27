@@ -1,4 +1,4 @@
-# Android后台执行定时任务
+##### 项目中需要做一个定时本地通知，本文是自己code时所遇到的问题以及解决方案的总结，其中借鉴了一些文章中的解决方式，文章后有借鉴文章链接和项目github地址。
 
 ##### Android 中的定时任务一般有两种实现方式，一种是使用 Java API 里提供的 Timer 类，一种是使用 Android 的 Alarm 机制。这两种方式在多数情况下都能实现类似的效果。
 
@@ -38,7 +38,7 @@
 #### 应用保活可以分为两个方面,一. 提供进程优先级，降低进程被杀死的概率，二. 在进程被杀死后，进行拉活
 #### 提升进程优先级的方案可分为Activity 提升权限, Notification 提升权限
 * Activity 提升权限有网传QQ一像素Activity方案,该方案涉及触摸时间拦截，各种状态监听操作难度复杂。
-* Notification 提升权限，API小于18可以直接设置前台Notification。API大于18利用系统漏洞，两个Service共同设置同一个ID 的前台Notification，并关闭其中一个Service，Notification小时，另一个Service优先级不变,次漏洞API=24时被修复
+* Notification 提升权限，API小于18可以直接设置前台Notification。API大于18利用系统漏洞，两个Service共同设置同一个ID 的前台Notification，并关闭其中一个Service，Notification消失，另一个Service优先级不变,次漏洞API=24时被修复
 
        public void onCreate() {
             super.onCreate();
@@ -222,3 +222,6 @@
             Intent smartIntent = new Intent();
             smartIntent.putExtra("packageName", context.getPackageName());
             smartIntent.setComponent(new ComponentName("com.smartisanos.security", "com.smartisanos.security.invokeHistory.InvokeHistoryActivity"));
+
+* [TamingTask](https://github.com/YougaKing/TamingTask)后台定时任务
+* 感谢[Android闹钟设置的解决方案](http://www.jianshu.com/p/1f919c6eeff6),[Android进程保活招式大全](https://dev.qq.com/topic/57ac4a0ea374c75371c08ce8)。
