@@ -61,11 +61,37 @@
             }
        }
 
-#### 进程死后拉活的方案可分为系统广播拉活, 利用第三方应用广播拉活，利用系统Service机制拉活，利用Native进程拉活
+#### 进程死后拉活的方案可分为系统广播拉活，利用系统Service机制拉活，利用Native进程拉活
 
-* 广播接收器被管理软件、系统软件通过“自启管理”等功能禁用的场景无法接收到广播，从而无法自启，系统广播事件不可控，只能保证发生事件时拉活进程，但无法保证进程挂掉后立即拉活。第三方应用广播拉活需要反编译适配主流APP,太耗时复杂随着应用程序升级可能失效
+* 广播接收器被管理软件、系统软件通过“自启管理”等功能禁用的场景无法接收到广播，从而无法自启，系统广播事件不可控，只能保证发生事件时拉活进程，但无法保证进程挂掉后立即拉活。
+
+        <receiver
+            android:name=".taming.WakeUpReceiver"
+            android:process=":Taming">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT"/>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED"/>
+                <action android:name="android.intent.action.PACKAGE_REMOVED"/>
+
+                <data android:scheme="package"/>
+            </intent-filter>
+        </receiver>
+        
 * 同时我们启动另个守护GuardService监听这个Service状态，如果发现这个被异常Service关闭则启动这个Service,API小于21我们用AlarmManager重复监听，API大于21我们使用JobScheduler监听，然而JobScheduler在API大于24时Doze模式会因为电池优化而无法正常执行，我们需要忽略电池优化
 
+
+        public int onStartCommand(Intent intent, int flags, int startId) {
+            return START_STICKY;
+        }
+        //守护GuardService
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             JobScheduler jobScheduler = (JobScheduler) getSystemService(Context.JOB_SCHEDULER_SERVICE);
             JobInfo.Builder builder = new JobInfo.Builder(0, new ComponentName(getPackageName(), JobSchedulerService.class.getName()));
@@ -111,3 +137,88 @@
           Daemon.run(TamingService.this, TamingService.class, Daemon.INTERVAL_ONE_MINUTE);
       }
     
+#### 综上所述，Android原生系统使用AlarmManager执行定时任务无需处于运行中,但是手机重启后会清除所有Alarm，所以最终导向还是应用保活。
+#### 非原生Android系统会对系统修改我们需要各种方式配合，保证最大几率保活。一Notification 提升权限，二监听解锁监控电池电量和充电状态，开机广播，网络变化，应用安装、卸载，三守护GuardService监听，四利用Native进程拉活。然而这四中方式都无法保证百分百保活，我们还需要根据各机型适配，引导用户加入手机白名单，每个手机厂商各个版本白名单方式都会变化，适配路漫漫其修远兮，只能祈祷国内Android生态越来越好吧。
+            //华为 自启管理
+            Intent huaweiIntent = new Intent();
+            huaweiIntent.setAction("huawei.intent.action.HSM_BOOTAPP_MANAGER");
+
+            //华为 锁屏清理
+            Intent huaweiGodIntent = new Intent();
+            huaweiGodIntent.setComponent(new ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"));
+
+            //小米 自启动管理
+            Intent xiaomiIntent = new Intent();
+            xiaomiIntent.setAction("miui.intent.action.OP_AUTO_START");
+            xiaomiIntent.addCategory(Intent.CATEGORY_DEFAULT);
+
+            //小米 神隐模式
+            Intent xiaomiGodIntent = new Intent();
+            xiaomiGodIntent.setComponent(new ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"));
+            xiaomiGodIntent.putExtra("package_name", context.getPackageName());
+            xiaomiGodIntent.putExtra("package_label", getApplicationName(context));
+
+            //三星 5.0/5.1 自启动应用程序管理
+            Intent samsungLIntent = context.getPackageManager().getLaunchIntentForPackage("com.samsung.android.sm");
+
+            //三星 6.0+ 未监视的应用程序管理
+            Intent samsungMIntent = new Intent();
+            samsungMIntent.setComponent(new ComponentName("com.samsung.android.sm_cn", "com.samsung.android.sm.ui.battery.BatteryActivity"));
+
+            //魅族 自启动管理
+            Intent meizuIntent = new Intent("com.meizu.safe.security.SHOW_APPSEC");
+            meizuIntent.addCategory(Intent.CATEGORY_DEFAULT);
+            meizuIntent.putExtra("packageName", context.getPackageName());
+
+            //魅族 待机耗电管理
+            Intent meizuGodIntent = new Intent();
+            meizuGodIntent.setComponent(new ComponentName("com.meizu.safe", "com.meizu.safe.powerui.PowerAppPermissionActivity"));
+
+            //Oppo 自启动管理
+            Intent oppoIntent = new Intent();
+            oppoIntent.setComponent(new ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
+
+            //Oppo 自启动管理(旧版本系统)
+            Intent oppoOldIntent = new Intent();
+            oppoOldIntent.setComponent(new ComponentName("com.color.safecenter", "com.color.safecenter.permission.startup.StartupAppListActivity"));
+
+            //Vivo 后台高耗电
+            Intent vivoGodIntent = new Intent();
+            vivoGodIntent.setComponent(new ComponentName("com.vivo.abe", "com.vivo.applicationbehaviorengine.ui.ExcessivePowerManagerActivity"));
+
+            //金立 应用自启
+            Intent gioneeIntent = new Intent();
+            gioneeIntent.setComponent(new ComponentName("com.gionee.softmanager", "com.gionee.softmanager.MainActivity"));
+
+            //乐视 自启动管理
+            Intent letvIntent = new Intent();
+            letvIntent.setComponent(new ComponentName("com.letv.android.letvsafe", "com.letv.android.letvsafe.AutobootManageActivity"));
+
+            //乐视 应用保护
+            Intent letvGodIntent = new Intent();
+            letvGodIntent.setComponent(new ComponentName("com.letv.android.letvsafe", "com.letv.android.letvsafe.BackgroundAppManageActivity"));
+
+            //酷派 自启动管理
+            Intent coolpadIntent = new Intent();
+            coolpadIntent.setComponent(new ComponentName("com.yulong.android.security", "com.yulong.android.seccenter.tabbarmain"));
+
+            //联想 后台管理
+            Intent lenovoIntent = new Intent();
+            lenovoIntent.setComponent(new ComponentName("com.lenovo.security", "com.lenovo.security.purebackground.PureBackgroundActivity"));
+
+            //联想 后台耗电优化
+            Intent lenovoGodIntent = new Intent();
+            lenovoGodIntent.setComponent(new ComponentName("com.lenovo.powersetting", "com.lenovo.powersetting.ui.Settings$HighPowerApplicationsActivity"));
+
+            //中兴 自启管理
+            Intent zteIntent = new Intent();
+            zteIntent.setComponent(new ComponentName("com.zte.heartyservice", "com.zte.heartyservice.autorun.AppAutoRunManager"));
+
+            //中兴 锁屏加速受保护应用
+            Intent zteGodIntent = new Intent();
+            zteGodIntent.setComponent(new ComponentName("com.zte.heartyservice", "com.zte.heartyservice.setting.ClearAppSettingsActivity"));
+
+            //锤子 自启动权限管理 //{cmp=com.smartisanos.security/.invokeHistory.InvokeHistoryActivity (has extras)} from uid 10070 on display 0
+            Intent smartIntent = new Intent();
+            smartIntent.putExtra("packageName", context.getPackageName());
+            smartIntent.setComponent(new ComponentName("com.smartisanos.security", "com.smartisanos.security.invokeHistory.InvokeHistoryActivity"));
